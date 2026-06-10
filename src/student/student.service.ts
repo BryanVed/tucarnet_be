@@ -60,6 +60,26 @@ export class StudentService {
   }
 
   /**
+   * Obtener estudiante por su identificador (student_id)
+   * @param student_id El ID (uuid) del estudiante.
+   * @returns La información del estudiante con su perfil biométrico.
+   */
+  async findById(student_id: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { student_id },
+      include: {
+        biometric_profile: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Estudiante no encontrado');
+    }
+
+    return student;
+  }
+
+  /**
    * Actualizar información del estudiante
    * @param id El ID del estudiante.
    * @param updateStudentDto Objeto con los datos a actualizar.
