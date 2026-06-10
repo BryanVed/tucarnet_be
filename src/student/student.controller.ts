@@ -1,4 +1,4 @@
-import { Controller, Get, Body, Patch, Param } from '@nestjs/common';
+import { Controller, Get, Body, Patch, Param, Query } from '@nestjs/common';
 import { StudentService } from './student.service';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { UpdateBiometricDto } from './dto/update-biometric.dto';
@@ -6,6 +6,24 @@ import { UpdateBiometricDto } from './dto/update-biometric.dto';
 @Controller('student')
 export class StudentController {
   constructor(private readonly studentService: StudentService) {}
+
+  /**
+   * GET /student
+   * Listar estudiantes con búsqueda opcional (código, email, nombre) y paginación.
+   * @returns { data, total, page, limit }
+   */
+  @Get()
+  async getStudents(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.studentService.findAllStudents({
+      search,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
 
   /**
    * GET /student/:email
