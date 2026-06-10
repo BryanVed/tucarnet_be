@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, InternalServerErrorException, NotFound
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { PrismaService } from 'prisma/prisma.service';
 import { UpdateBiometricDto } from './dto/update-biometric.dto';
-import { BiometricStatus, ValidationResult } from '@prisma/client';
+import { BiometricStatus, ValidationResult, Prisma } from '@prisma/client';
 
 @Injectable()
 export class StudentService {
@@ -57,6 +57,26 @@ export class StudentService {
     } catch (error) {
       throw error;
     }
+  }
+
+  /**
+   * Obtener estudiante por su identificador (student_id)
+   * @param student_id El ID (uuid) del estudiante.
+   * @returns La información del estudiante con su perfil biométrico.
+   */
+  async findById(student_id: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { student_id },
+      include: {
+        biometric_profile: true,
+      },
+    });
+
+    if (!student) {
+      throw new NotFoundException('Estudiante no encontrado');
+    }
+
+    return student;
   }
 
   /**
@@ -318,5 +338,43 @@ export class StudentService {
         'Error al reiniciar el perfil biométrico',
       );
     }
+  }
+
+  /**
+   * Lista estudiantes con búsqueda opcional por código, email o nombre y paginación.
+   * @param params search (término de búsqueda), page y limit
+   * @returns { data, total, page, limit }
+   */
+  async findAllStudents(params: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { search, page = 1, limit = 20 } = params;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.StudentWhereInput = search
+      ? {
+          OR: [
+            { student_code: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+            { name: { contains: search, mode: 'insensitive' } },
+            { last_name: { contains: search, mode: 'insensitive' } },
+          ],
+        }
+      : {};
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.student.findMany({
+        where,
+        include: { biometric_profile: true },
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.student.count({ where }),
+    ]);
+
+    return { data, total, page, limit };
   }
 }
