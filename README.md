@@ -1,98 +1,175 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# TuCarnet — Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API REST del sistema de carnet estudiantil digital de la UFPS. Gestiona el registro/login de estudiantes vía Firebase Authentication, la validación biométrica, la generación y validación de códigos QR del carnet, y la administración de solicitudes de cambio de foto.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Tecnologías
 
-## Description
+- **NestJS 11** (sobre **Fastify**)
+- **Prisma 6** + **PostgreSQL**
+- **Firebase Admin SDK** (verificación de tokens)
+- **JWT** (`@nestjs/jwt`, passport-jwt) para sesiones de administradores y firma de QR
+- **APIs externas:** Divisist (SAT-SIA) y Moodle. En desarrollo/demo se reemplazan por el [`ufps-mock-api`](../ufps-mock-api).
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+> Todas las rutas están bajo el prefijo global **`/api`** (ver `src/main.ts`).
 
-## Project setup
+## Requisitos previos
+
+- Node.js 20+ y npm
+- Docker (para la base de datos local)
+- Una credencial de cuenta de servicio de Firebase (`firebase-admin-key.json`)
+
+## Puesta en marcha (local)
+
+### 1. Instalar dependencias
 
 ```bash
-$ npm install
+npm install
 ```
 
-## Compile and run the project
+### 2. Levantar PostgreSQL
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker compose up -d
 ```
 
-## Run tests
+Esto expone Postgres en `localhost:5499` (usuario `admin`, contraseña `admin123`, base `mydb`), según `docker-compose.yml`.
+
+### 3. Configurar variables de entorno
+
+Copia `.env.example` a `.env` y completa los valores:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cp .env.example .env
 ```
 
-## Deployment
+| Variable | Descripción |
+|---|---|
+| `NODE_ENV` | `development` (usa archivo de Firebase) o `production` (usa variable) |
+| `PORT` | Puerto del servidor (default 3000) |
+| `DATABASE_URL` | Cadena de conexión a PostgreSQL |
+| `JWT_SECRET` | Secreto para los JWT de administradores |
+| `QR_JWT_SECRET` | Secreto para firmar/validar los QR |
+| `DIVISIST_API_URL` | URL de la API Divisist (o del mock) |
+| `DIVISIST_API_KEY` | Token de Divisist (el mock lo ignora) |
+| `MOODLE_API_URL` | URL de la API Moodle (o del mock) |
+| `MOODLE_API_TOKEN` | Token de Moodle (el mock lo ignora) |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | Solo en producción: JSON de la cuenta de servicio en una línea |
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+En desarrollo, apunta `DIVISIST_API_URL` y `MOODLE_API_URL` al mock (`http://localhost:8000`).
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 4. Credencial de Firebase
+
+- **Desarrollo** (`NODE_ENV=development`): coloca el archivo `firebase-admin-key.json` en la **carpeta padre del proyecto** (`../firebase-admin-key.json`, ver `src/config/firebase.config.ts`). Está en `.gitignore`, nunca se versiona.
+- **Producción** (`NODE_ENV=production`): no se usa archivo; se lee el JSON completo desde la variable `FIREBASE_SERVICE_ACCOUNT_KEY`.
+
+> La app cliente debe usar el **mismo proyecto de Firebase**; de lo contrario la verificación de tokens fallará.
+
+### 5. Generar el cliente Prisma y aplicar migraciones
 
 ```bash
-$ npm install -g mau
-$ mau deploy
+npx prisma generate
+npx prisma migrate dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 6. Arrancar el servidor
 
-## Resources
+```bash
+npm run start:dev    # modo watch (desarrollo)
+npm run start        # desarrollo sin watch
+npm run start:prod   # build + producción
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+La API queda en `http://localhost:3000/api`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Endpoints principales
 
-## Support
+Todos con prefijo `/api`.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Autenticación (`/auth`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/login` | Login/registro de estudiante. Requiere `Authorization: Bearer <Firebase ID token>`. Verifica en Divisist (y Moodle si es posgrado). |
 
-## Stay in touch
+### Estudiantes (`/student`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/student/:email` | Obtiene un estudiante por email |
+| GET | `/student/code/:student_code` | Obtiene un estudiante por código |
+| PATCH | `/student/biometric/validate` | Registra una validación biométrica |
+| GET | `/student/biometric/status/:student_id` | Estado del perfil biométrico |
+| PATCH | `/student/biometric/reset/:student_id` | Reinicia el perfil biométrico |
+| PATCH | `/student/:id` | Actualiza datos del estudiante |
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### QR (`/qr`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/qr/generate` | Genera el QR firmado del carnet |
+| POST | `/qr/validate` | Valida un QR escaneado |
 
-## License
+### Administradores (`/admin`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/admin/login` | Login de administrador (JWT) |
+| POST | `/admin` | Crea un administrador |
+| GET | `/admin` | Lista administradores activos |
+| GET | `/admin/inactive` | Lista administradores inactivos |
+| GET | `/admin/all-status` | Lista todos los administradores |
+| GET | `/admin/:id` | Obtiene un administrador |
+| PATCH | `/admin/:id` | Actualiza un administrador |
+| PATCH | `/admin/:id/password` | Cambia la contraseña |
+| DELETE | `/admin/:id` | Elimina un administrador |
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Solicitudes de foto (`/photo-request`)
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/photo-request` | Crea una solicitud de cambio de foto |
+| GET | `/photo-request/can-request/:student_id` | Indica si el estudiante puede solicitar |
+| GET | `/photo-request/student/:student_id` | Solicitudes de un estudiante |
+| GET | `/photo-request/pending` | Solicitudes pendientes |
+| GET | `/photo-request/approved` | Solicitudes aprobadas |
+| GET | `/photo-request/admin/:admin_id` | Solicitudes atendidas por un admin |
+| GET | `/photo-request/statistics/overview` | Estadísticas generales |
+| GET | `/photo-request/:request_id` | Detalle de una solicitud |
+| PATCH | `/photo-request/respond` | Aprueba o rechaza una solicitud |
+
+## Tests
+
+```bash
+npm run test        # unitarios
+npm run test:e2e    # end-to-end
+npm run test:cov    # cobertura
+```
+
+## Despliegue en Railway
+
+1. **PostgreSQL:** añade un servicio **PostgreSQL** al proyecto de Railway.
+2. **Servicio backend:** conéctalo a este repositorio.
+3. **Comandos** (Settings):
+   - Build: `npm install && npx prisma generate && npm run build`
+   - Start: `npx prisma migrate deploy && node dist/main`
+4. **Variables de entorno:**
+
+| Variable | Valor |
+|---|---|
+| `NODE_ENV` | `production` |
+| `PORT` | `3000` |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+| `JWT_SECRET` | secreto fuerte |
+| `QR_JWT_SECRET` | secreto fuerte |
+| `DIVISIST_API_URL` | URL pública del mock desplegado |
+| `MOODLE_API_URL` | URL pública del mock desplegado |
+| `DIVISIST_API_KEY` | cualquier valor (mock lo ignora) |
+| `MOODLE_API_TOKEN` | cualquier valor (mock lo ignora) |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | JSON de la cuenta de servicio en una línea |
+
+5. Genera el dominio enrutando al puerto **3000**.
+
+> Para generar el JSON de Firebase compactado en una línea:
+> ```powershell
+> Get-Content firebase-admin-key.json -Raw | ConvertFrom-Json | ConvertTo-Json -Compress
+> ```
+
+## Notas
+
+- En desarrollo/demo se usa el `ufps-mock-api`, que **solo implementa el flujo de Divisist** (pregrado). El endpoint de Moodle (posgrado) no está mockeado: esos estudiantes quedarán como `NO_ACTIVO`.
+- En `divisist.service.ts` el header `Authorization` está comentado porque el mock no requiere token; descoméntalo al usar la API real.

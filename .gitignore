@@ -43,6 +43,7 @@ lerna-debug.log*
 .env.production.local
 .env.local
 firebase-admin-key.json
+firebase-admin-key*.json
 
 # temp directory
 .temp
